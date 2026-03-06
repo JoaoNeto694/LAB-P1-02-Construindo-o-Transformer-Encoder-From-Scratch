@@ -10,7 +10,7 @@ import pandas as pd
 # Frase usada: "Eu tenho apenas dez reais na minha conta"
 vocab = {
     "palavra": ["Eu", "tenho", "apenas", "dez", "reais", "na", "minha", "conta"],
-    "id":      [0, 1, 2, 3, 4, 5, 6, 7]
+    "id": [0, 1, 2, 3, 4, 5, 6, 7]
 }
 
 # Aqui foi criado um DataFrame para converter as palavras para IDs
@@ -24,10 +24,10 @@ vocab_size  = len(word_to_id)
 frase = ["Eu", "tenho", "apenas", "dez", "reais", "na", "minha", "conta"]
 input_ids = [word_to_id[w] for w in frase]
 d_model = 64 # Dimensão do modelo(foi indicado o valor 64)
-d_ffn    = 256 # Dimensão da camada feed-forward-network
-h       = 8 # Número de cabeças
-d_k     = d_model // h # Dimensão de cada cabeça
-N       = 6 # Número de blocos do encoder
+d_ffn = 256 # Dimensão da camada feed-forward-network
+h = 8 # Número de cabeças
+d_k = d_model // h # Dimensão de cada cabeça
+N = 6 # Número de blocos do encoder
 
 # Aqui, criei uma tabela de embeddings aleatória para o vocabulário
 embedding_table = np.random.randn(vocab_size, d_model)
@@ -40,7 +40,7 @@ batch_size, seq_len, _ = X.shape
 
 
 
-# PASSO 2: Funcoes do Encoder
+# PASSO 2: O Motor Matemático
 # Nesse passo, implementei a self attention, a classe de multi-head attention, 
 # a função de normalização e a classe de feed-forward.
 
@@ -53,17 +53,17 @@ def softmax(x):
 # Self-attention normal
 def scaled_dot_product_attention(Q, K, V):
     d_k_local = Q.shape[-1] # Pega o valor da dimensão das cebeças
-    scores  = Q @ K.transpose(0, 2, 1) # Calcula os scores (Q * K^T)
-    scores  = scores / np.sqrt(d_k_local) # Suaviza os scores dividindo pela raiz quadrada da dimensão das cabeças
+    scores = Q @ K.transpose(0, 2, 1) # Calcula os scores (Q * K^T)
+    scores = scores / np.sqrt(d_k_local) # Suaviza os scores dividindo pela raiz quadrada da dimensão das cabeças
     weights = softmax(scores) # Aplica softmax para obter os pesos de atenção
-    output  = weights @ V # Calcula a saída ponderada (weights * V)
+    output = weights @ V # Calcula a saída ponderada (weights * V)
     return output, weights
 
 
 class MultiHeadAttention:
     def __init__(self, d_model, h):
-        self.h       = h
-        self.d_k     = d_model // h
+        self.h = h
+        self.d_k = d_model // h
         self.d_model = d_model
 
         # Pesos por cabeca:
@@ -105,7 +105,7 @@ class MultiHeadAttention:
 def layer_norm(X, epsilon=1e-6):
     # Normalização de camada: (X - mean) / sqrt(var + epsilon) (como indicado no documento)
     mean = np.mean(X, axis=-1, keepdims=True)
-    var  = np.var(X,  axis=-1, keepdims=True)
+    var = np.var(X,  axis=-1, keepdims=True)
     return (X - mean) / np.sqrt(var + epsilon)
 
 
@@ -132,9 +132,30 @@ class EncoderBlock:
     def forward(self, X):
         # O bloco do encoder descrito é composto por uma camada de multi-head attention e seguida por uma camada feed-forward,
         # com normalização depois de cada uma delas
-        X_att   = self.mha.forward(X)
+        X_att = self.mha.forward(X)
         X_norm1 = layer_norm(X + X_att)
-        X_ffn   = self.ffn.forward(X_norm1)
-        X_out   = layer_norm(X_norm1 + X_ffn)
+        X_ffn = self.ffn.forward(X_norm1)
+        X_out = layer_norm(X_norm1 + X_ffn)
         return X_out
 
+# PASSO 3: Empilhando tudo
+# Aqui as camadas foram empilhaadas para gerar o Z final.
+encoder_stack = [EncoderBlock(d_model, h, d_ffn) for _ in range(N)]
+
+# Fiz uma cópia de X para Z para poder mostrar como estava nates e como fica depois(Validação de sanidade)
+Z = X.copy()
+
+# Agora, passo a entrada por cada bloco do encoder
+for i, block in enumerate(encoder_stack):
+    shape_antes = Z.shape
+    Z = block.forward(Z)
+
+# VALIDACAO DE SANIDADE
+print("Dimensoes iniciais: %s" % str(X.shape))
+print("Dimensoes finais: %s" % str(Z.shape))
+
+print("\nZ final (primeiros 8 valores de cada token)")
+for idx, palavra in enumerate(frase):
+    vals = Z[0, idx, :8]
+    vals_str = "  ".join("%+.4f" % v for v in vals)
+    print("[%d] %-10s: [%s]" % (idx, palavra, vals_str))
